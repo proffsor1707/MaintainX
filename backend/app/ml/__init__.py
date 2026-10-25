@@ -1,0 +1,1 @@
+"""Reusable inference-only integration for trusted exported ML artifacts."""

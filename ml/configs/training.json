@@ -1,0 +1,7 @@
+{
+  "random_state": 42,
+  "test_fraction": 0.2,
+  "validation_fraction": 0.2,
+  "logistic_regression_max_iter": 1000,
+  "logistic_regression_c": 1.0
+}

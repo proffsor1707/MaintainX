@@ -1,0 +1,1 @@
+`synthetic_failure_risk.csv` is generated deterministically by `python -m src.data.generate_sample`. It is synthetic test input, not operational or real-world data.

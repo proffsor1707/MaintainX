@@ -1,0 +1,10 @@
+__pycache__/
+.pytest_cache/
+*.py[cod]
+*.egg-info/
+.venv/
+models/*.joblib
+models/*.json
+!models/.gitkeep
+datasets/*.csv
+!datasets/synthetic_failure_risk.csv
