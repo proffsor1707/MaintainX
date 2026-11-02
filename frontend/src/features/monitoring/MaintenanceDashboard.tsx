@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Show, SignInButton, SignUpButton, UserButton } from "@clerk/react";
 import { useLocation } from "wouter";
 import { useDashboardUser } from "@/features/auth/useDashboardUser";
@@ -6,6 +6,8 @@ import { useDashboardTheme, type DashboardTheme } from "@/app/ThemeProvider";
 import { useDashboardRisk } from "@/features/predictions/useDashboardRisk";
 import { useDashboardApiData } from "@/features/monitoring/useDashboardApiData";
 import { useRepositorySelection } from "@/features/systems/useRepositorySelection";
+import ProjectScanner, { type ProjectScannerHandle } from "@/features/scanning/ProjectScanner";
+import SettingsDialog from "@/features/settings/SettingsDialog";
 import { dashboardMetrics, forecast, recommendedActions, repositories, severityMeta } from "@/mocks/mockData";
 import type { Severity } from "@/types/dashboard";
 import {
@@ -68,14 +70,12 @@ export default function MaintenanceDashboard({
     setSelectedPath,
     selectedModule,
     filteredModules,
-    isScanning: isDemoScanning,
-    scanComplete,
-    runScan,
-    clearScanComplete,
   } = useDashboardRisk();
-  const [sidebarOpen, setSidebarOpen] = useState(() => window.innerWidth > 720);
+  const [settingsOpen, setSettingsOpen] = useState(initialSection === "Settings");
+  const [isScanning, setIsScanning] = useState(false);
   const [toast, setToast] = useState("");
-  const { theme, setTheme } = useDashboardTheme();
+  const scannerRef = useRef<ProjectScannerHandle>(null);
+  const { theme, setTheme, sidebarExpanded: sidebarOpen, setSidebarExpanded, resetPreferences } = useDashboardTheme();
   const { isLoaded, isSignedIn, userName, userEmail } = useDashboardUser();
   const apiData = useDashboardApiData();
   const liveData = apiData.mode === "live";
@@ -90,7 +90,6 @@ export default function MaintenanceDashboard({
   const findingCounts = liveData ? apiData.incidentCounts : dashboardMetrics.findingCounts;
   const findingTotal = findingCounts.critical + findingCounts.high + findingCounts.medium;
   const findingBarWidth = (count: number) => findingTotal === 0 ? "0%" : `${(count / findingTotal) * 100}%`;
-  const isScanning = isDemoScanning || apiData.isPredicting;
   const displayRecommendations = liveData ? apiData.recommendations?.recommendations.map((item) => ({
     severity: apiData.recommendations!.risk_level === "critical" ? "critical" as const
       : apiData.recommendations!.risk_level === "high" ? "high" as const
@@ -112,24 +111,7 @@ export default function MaintenanceDashboard({
     return name ? `${timeGreeting}, ${name}.` : `${timeGreeting}.`;
   };
 
-  const handleScan = async () => {
-    if (liveData) {
-      try {
-        const result = await apiData.runPrediction();
-        setToast(`Prediction complete · ${(result.failure_probability * 100).toFixed(1)}% failure risk`);
-        window.setTimeout(() => setToast(""), 3500);
-      } catch (error) {
-        setToast(error instanceof Error ? error.message : "Prediction request failed.");
-        window.setTimeout(() => setToast(""), 4500);
-      }
-      return;
-    }
-
-    runScan(() => {
-      setToast("Demo scan complete · sample data only");
-      window.setTimeout(() => setToast(""), 3500);
-    });
-  };
+  const handleScan = () => scannerRef.current?.startScan();
 
   const handleAction = (message: string) => {
     setToast(message);
@@ -140,6 +122,11 @@ export default function MaintenanceDashboard({
     setActiveSection(section);
     navigate(route);
     if (targetId) window.setTimeout(() => document.getElementById(targetId)?.scrollIntoView({ behavior: "smooth", block: "start" }), 0);
+  };
+
+  const changeSettingsOpen = (open: boolean) => {
+    setSettingsOpen(open);
+    if (!open && location === "/settings") navigate("/dashboard");
   };
 
   return (
@@ -177,14 +164,14 @@ export default function MaintenanceDashboard({
           <button className={activeSection === "Repositories" ? "nav-item active" : "nav-item"} onClick={() => { setActiveSection("Repositories"); navigate("/systems"); handleAction("Repository manager opened"); }}>
             <Github size={17} /><span>{sidebarOpen && "Repositories"}</span>
           </button>
-          <button className={activeSection === "Settings" ? "nav-item active" : "nav-item"} onClick={() => { setActiveSection("Settings"); navigate("/settings"); handleAction("Settings panel is ready"); }}>
+          <button className={activeSection === "Settings" ? "nav-item active" : "nav-item"} onClick={() => { setActiveSection("Settings"); setSettingsOpen(true); navigate("/settings"); }}>
             <Settings2 size={17} /><span>{sidebarOpen && "Settings"}</span>
           </button>
         </nav>
 
         <div className="sidebar-bottom">
           {sidebarOpen && <div className="model-status"><span className="status-dot" />Model online <span className="model-version">v0.9.4</span></div>}
-          <button className="collapse-button" onClick={() => setSidebarOpen((value) => !value)} aria-label={sidebarOpen ? "Collapse sidebar" : "Expand sidebar"}>
+          <button className="collapse-button" onClick={() => setSidebarExpanded(!sidebarOpen)} aria-label={sidebarOpen ? "Collapse sidebar" : "Expand sidebar"}>
             {sidebarOpen ? <PanelLeftClose size={17} /> : <PanelLeftOpen size={17} />}
             {sidebarOpen && "Collapse"}
           </button>
@@ -210,7 +197,7 @@ export default function MaintenanceDashboard({
               </SignUpButton>
             </Show>
             <Show when="signed-in"><UserButton /></Show>
-            <button className="mobile-menu" onClick={() => setSidebarOpen((value) => !value)}><Menu size={18} /></button>
+            <button className="mobile-menu" onClick={() => setSidebarExpanded(!sidebarOpen)}><Menu size={18} /></button>
           </div>
         </header>
 
@@ -292,6 +279,8 @@ export default function MaintenanceDashboard({
             </section>
           )}
 
+          {activeSection !== "Login" && <ProjectScanner ref={scannerRef} onScanningChange={setIsScanning} />}
+
           {activeSection !== "Login" && (
             <>
               <section className="stats-grid" aria-label="Repository metrics">
@@ -328,7 +317,7 @@ export default function MaintenanceDashboard({
               <section className="content-grid">
                 <article className="panel risk-panel" id="risk-map">
                   <div className="panel-heading">
-                    <div><div className="panel-kicker"><span className="signal-bar" />Priority queue</div><h2>{liveData ? "Sample modules at risk" : "Modules at risk"}</h2><p>{liveData ? "Sample module rows; no module risk endpoint is available yet" : "Sample risk ranking"}</p></div>
+                    <div><div className="panel-kicker"><span className="signal-bar" />Illustrative module risk map</div><h2>Sample data</h2><p>This legacy module ranking is illustrative. The local folder scan above analyzes the files you select.</p></div>
                     <button className="ghost-button" onClick={() => { setSeverityFilter("all"); setSearchTerm(""); handleAction("Showing all risk modules"); }}>View all <ArrowUpRight size={14} /></button>
                   </div>
                   <div className="risk-toolbar">
@@ -383,8 +372,22 @@ export default function MaintenanceDashboard({
         </div>
       </main>
 
+      <SettingsDialog
+        open={settingsOpen}
+        onOpenChange={changeSettingsOpen}
+        isLoaded={isLoaded}
+        isSignedIn={Boolean(isSignedIn)}
+        userName={userName ?? ""}
+        userEmail={userEmail ?? ""}
+        theme={theme}
+        setTheme={setTheme}
+        sidebarExpanded={sidebarOpen}
+        setSidebarExpanded={setSidebarExpanded}
+        resetPreferences={resetPreferences}
+        dashboardDataMode={apiData.mode}
+        dashboardDataError={apiData.error}
+      />
       {toast && <div className="toast"><span className="toast-check"><Check size={13} /></span>{toast}<button onClick={() => setToast("")}><X size={13} /></button></div>}
-      {scanComplete && <div className="scan-complete"><Check size={13} /> Demo scan completed · sample data only<button onClick={clearScanComplete}><X size={12} /></button></div>}
     </div>
   );
 }

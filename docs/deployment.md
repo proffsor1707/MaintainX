@@ -14,6 +14,10 @@ Set configuration through the deployment environment or a private root `.env` fi
 
 Never put a Clerk secret key, database password, or populated `.env` file in the frontend, image, repository, or logs. The current implementation verifies Clerk JWT signatures with JWKS and issuer but does not implement per-user data ownership because the schema has no user/system association.
 
+For local development, the frontend `.env.local` uses `/api/v1`, and Vite proxies that path to `http://127.0.0.1:8000` (override with `API_PROXY_TARGET`). Backend settings read the project root and `backend/.env` independent of the process working directory; `python-dotenv` is installed by the backend base requirements. `backend/.env.example` uses a persistent SQLite file for local development, while deployments should use PostgreSQL. The public health endpoint does not need a database or Clerk token; protected system/incident routes need a database and valid Clerk JWKS URL and issuer.
+
+The dashboard's **Local source scan** is a separate browser-only feature. It scans only the folder the user selects and never uploads its contents. It checks a small set of source patterns, not dependency advisories or runtime behavior. Each new folder selection starts a fresh scan and clears previous results.
+
 ## Compose deployment
 
 1. Supply the required values in a protected environment or a local untracked `.env`.

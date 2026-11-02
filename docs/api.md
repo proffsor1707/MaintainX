@@ -5,6 +5,7 @@ All routes are under `/api/v1`. JSON validation errors use FastAPI's 422 respons
 | Method | Path | Purpose |
 | --- | --- | --- |
 | GET | `/health` | Public liveness response `{ "status": "ok" }` |
+| POST | `/scan-url` | Authenticated public-page HTML fetch for the browser source-pattern scanner; rejects private/local addresses and limits redirects, time, and response size. Body: `{ "url": "https://example.com" }`. |
 | POST | `/predictions` | Six Phase 8 features plus optional `system_id`; returns failure probability, risk level, model version and timestamp. If a system ID is provided, the prediction is persisted and that system must exist. |
 | GET, POST | `/systems` | List systems / create a system |
 | GET | `/systems/{system_id}` | Retrieve a system |

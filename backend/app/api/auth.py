@@ -41,6 +41,12 @@ def require_authenticated_user(
     token = credentials.credentials
     try:
         signing_key = _get_jwks_client(settings.clerk_jwks_url.strip()).get_signing_key_from_jwt(token)
+    except jwt.InvalidTokenError as error:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid bearer token.",
+            headers={"WWW-Authenticate": "Bearer"},
+        ) from error
     except PyJWKClientConnectionError as error:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,

@@ -26,6 +26,16 @@ def test_business_routes_require_bearer_authentication(unauthenticated_client: T
     assert response.headers["www-authenticate"] == "Bearer"
 
 
+def test_malformed_bearer_token_returns_401_instead_of_internal_error(unauthenticated_client: TestClient) -> None:
+    response = unauthenticated_client.get(
+        "/api/v1/systems",
+        headers={"Authorization": "Bearer invalid"},
+    )
+
+    assert response.status_code == 401
+    assert response.json()["detail"] == "Invalid bearer token."
+
+
 def test_health_remains_public(unauthenticated_client: TestClient) -> None:
     response = unauthenticated_client.get("/api/v1/health")
 
