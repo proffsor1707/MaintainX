@@ -24,3 +24,5 @@ pythonpath = ["."]
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["src*"]
+[tool.vercel]
+entrypoint = "backend.app.main:app"
